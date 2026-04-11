@@ -718,7 +718,7 @@ let currentPeriod = 'uke';
 let periodOffset  = 0;
 let pField        = null;
 
-function blank() { return { skog:5, vei:5, fotball:55, svom:1800, styrke:0 }; }
+function blank() { return { skog:0, vei:0, fotball:0, svom:0, styrke:0 }; }
 
 // ─── TABS ──────────────────────────────────────────────────────
 function switchTab(tab) {
@@ -842,6 +842,8 @@ function clearDay() {
 }
 
 // ─── PICKER CONFIG ─────────────────────────────────────────────
+// Default wheel positions when field is empty (0)
+const PICKER_DEFAULTS = { skog:5, vei:5, fotball:55, svom:1800 };
 // type 'km'    → left: whole km (0–30), right: tenths (0 or 5)
 // type 'hhmm'  → left: hours (0–3), right: minutes (0,5,10…55)
 // type 'single'→ left wheel only
@@ -878,7 +880,7 @@ function openPicker(field) {
   const unitR    = document.getElementById('unit-right');
 
   if (cfg.type === 'km') {
-    const val   = form[field] || 0;
+    const val   = form[field] || PICKER_DEFAULTS[field];
     const whole = Math.floor(val);
     const dec   = Math.round((val - whole) * 10); // 0–9
 
@@ -895,7 +897,7 @@ function openPicker(field) {
       dec < 10 ? dec : 0);
 
   } else if (cfg.type === 'hhmm') {
-    const val    = form[field] || 0;
+    const val    = form[field] || PICKER_DEFAULTS[field];
     const hours  = Math.floor(val / 60);
     const mins   = val % 60;
     const minIdx = Math.round(mins / 5);
@@ -914,7 +916,7 @@ function openPicker(field) {
 
   } else { // single
     unitL.textContent = cfg.leftUnit;
-    const curVal = form[field] || 0;
+    const curVal = form[field] || PICKER_DEFAULTS[field] || 0;
     const idx    = cfg.vals.findIndex(v => Math.abs(v.val - curVal) < 0.01);
     buildWheel('wheel-left', cfg.vals, idx < 0 ? 0 : idx);
     sep.textContent = '';
