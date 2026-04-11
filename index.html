@@ -162,7 +162,7 @@ body {
 .day-chip.active.has-data::after { background: var(--accent2); }
 
 /* ── DIARY FORM ──────────────────────── */
-.diary-form { padding: 20px 20px 120px; }
+.diary-form { padding: 14px 16px 80px; }
 
 .date-heading {
   font-size: 15px;
@@ -170,7 +170,7 @@ body {
   color: var(--ink);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin-bottom: 22px;
+  margin-bottom: 12px;
 }
 
 /* ── ACTIVITY ROWS ───────────────────── */
@@ -178,8 +178,8 @@ body {
   background: var(--paper);
   border: 1px solid var(--edge);
   border-radius: var(--r);
-  padding: 16px 18px;
-  margin-bottom: 10px;
+  padding: 11px 18px;
+  margin-bottom: 7px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -200,7 +200,7 @@ body {
   font-size: 11px;
   color: var(--muted2);
   letter-spacing: 0.06em;
-  min-width: 26px;
+  width: 36px;
 }
 
 /* Value tap button (scroll picker trigger) */
@@ -208,7 +208,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--edge);
   border-radius: var(--rs);
-  padding: 10px 14px;
+  padding: 7px 14px;
   font-family: 'Geist Mono', monospace;
   font-size: 20px;
   font-weight: 600;
@@ -363,7 +363,7 @@ body {
   margin-bottom: 14px;
 }
 
-.chart-wrap { position: relative; height: 190px; }
+.chart-wrap { position: relative; height: 100px; }
 
 .legend { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 .leg { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
@@ -1227,7 +1227,7 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, chartTitle, chartLabe
             stepSize: 1,
             color: '#8a8a9a',
             font: { size: 9, family: 'Geist Mono' },
-            callback: v => Number.isInteger(v) ? v : null
+            callback: v => Number.isInteger(v) && v >= 2 ? v : null
           },
           grid: { color: 'rgba(0,0,0,0.04)' },
           border: { color: '#e2ddd6' }
