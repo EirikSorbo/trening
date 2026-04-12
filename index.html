@@ -210,7 +210,7 @@ body {
   border-radius: var(--rs);
   padding: 7px 14px;
   font-family: 'Geist Mono', monospace;
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   min-width: 86px;
@@ -219,8 +219,9 @@ body {
   transition: border-color 0.15s;
   letter-spacing: 0.02em;
   user-select: none;
+  line-height: 1;
 }
-.val-tap.empty { color: var(--muted2); font-size: 15px; font-weight: 400; }
+.val-tap.empty { color: var(--muted2); font-weight: 400; }
 .val-tap:active { border-color: var(--accent); }
 
 /* Counter (styrke) */
@@ -230,19 +231,20 @@ body {
   background: var(--surface);
   border: 1px solid var(--edge);
   border-radius: var(--rs);
-  padding: 10px 0;
-  font-size: 20px;
+  padding: 7px 0;
+  font-size: 15px;
   font-weight: 600;
   width: 56px;
   text-align: center;
+  line-height: 1;
 }
 
 .cnt-btn {
   background: var(--paper);
   border: 1px solid var(--edge);
   border-radius: var(--rs);
-  width: 38px; height: 38px;
-  font-size: 22px;
+  width: 30px; height: 30px;
+  font-size: 18px;
   font-weight: 400;
   color: var(--ink);
   cursor: pointer;
@@ -608,6 +610,14 @@ body {
     </div>
 
     <div class="activity-card">
+      <span class="act-name">Langrenn</span>
+      <div class="act-input">
+        <button class="val-tap empty" id="tap-langrenn" onclick="openPicker('langrenn')">—</button>
+        <span class="act-unit">km</span>
+      </div>
+    </div>
+
+    <div class="activity-card">
       <span class="act-name">Styrke</span>
       <div class="act-input">
         <div class="counter-row">
@@ -674,12 +684,12 @@ const MONTHS_NO = ['Januar','Februar','Mars','April','Mai','Juni','Juli','August
 const MONTHS_SH = ['Jan','Feb','Mar','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Des'];
 
 const ACT_COLORS = {
-  skog:'#4a9e78', vei:'#3d7cb5', fotball:'#c49a3d', svom:'#e07840', styrke:'#9e5a7a'
+  skog:'#4a9e78', vei:'#3d7cb5', fotball:'#c49a3d', svom:'#e07840', styrke:'#9e5a7a', langrenn:'#7a5a9e'
 };
 const ACT_NAMES = {
-  skog:'Løping i skog', vei:'Løping på vei', fotball:'Fotball', svom:'Svømming', styrke:'Styrke'
+  skog:'Løping i skog', vei:'Løping på vei', fotball:'Fotball', svom:'Svømming', styrke:'Styrke', langrenn:'Langrenn'
 };
-const ACT_UNITS = { skog:'km', vei:'km', fotball:'min', svom:'m', styrke:'sett' };
+const ACT_UNITS = { skog:'km', vei:'km', fotball:'min', svom:'m', styrke:'sett', langrenn:'km' };
 
 // ─── STORAGE ───────────────────────────────────────────────────
 function loadAll() { try { return JSON.parse(localStorage.getItem('treningslogg_v2') || '{}'); } catch { return {}; } }
@@ -717,7 +727,7 @@ let currentPeriod = 'uke';
 let periodOffset  = 0;
 let pField        = null;
 
-function blank() { return { skog:0, vei:0, fotball:0, svom:0, styrke:0 }; }
+function blank() { return { skog:0, vei:0, fotball:0, svom:0, styrke:0, langrenn:0 }; }
 
 // ─── TABS ──────────────────────────────────────────────────────
 function switchTab(tab) {
@@ -781,7 +791,7 @@ function loadForm() {
 }
 
 function renderForm() {
-  ['skog','vei'].forEach(k => {
+  ['skog','vei','langrenn'].forEach(k => {
     const tap = document.getElementById('tap-' + k);
     const v   = form[k] || 0;
     if (v > 0) {
@@ -842,7 +852,7 @@ function clearDay() {
 
 // ─── PICKER CONFIG ─────────────────────────────────────────────
 // Default wheel positions when field is empty (0)
-const PICKER_DEFAULTS = { skog:5, vei:5, fotball:55, svom:1800 };
+const PICKER_DEFAULTS = { skog:5, vei:5, fotball:55, svom:1800, langrenn:10 };
 // type 'km'    → left: whole km (0–30), right: tenths (0 or 5)
 // type 'hhmm'  → left: hours (0–3), right: minutes (0,5,10…55)
 // type 'single'→ left wheel only
@@ -864,6 +874,10 @@ const PICKER_CONFIG = {
     type: 'single', label: 'Svømming',
     leftUnit: 'm',
     vals: Array.from({length:51}, (_,i) => ({val:i*100, label:String(i*100)}))
+  },
+  langrenn: {
+    type: 'km', label: 'Langrenn',
+    leftUnit: 'km', sep: '.', rightUnit: 'des'
   }
 };
 
@@ -1053,8 +1067,8 @@ function renderMonthOverview(all) {
   const yr     = target.getFullYear();
   document.getElementById('period-label').textContent = `${mName} ${yr}`;
 
-  const weeks  = getWeeksInMonth(target);
-  const allDates = weeks.flat();
+  const weeks    = getWeeksInMonth(target);
+  const allDates = weeks.flat().filter(d => d.getMonth() === target.getMonth() && d.getFullYear() === yr);
   const entries  = allDates.map(d => all[dateStr(d)] || {});
   const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
@@ -1116,7 +1130,7 @@ function calcAvgPerWeek(all, filterYear) {
 
 // ── BUILD DATASETS ───────────────────────────────────────────
 function buildDatasets(all, dates) {
-  return ['skog','vei','fotball','svom','styrke'].map(k => ({
+  return ['skog','vei','fotball','svom','langrenn','styrke'].map(k => ({
     label: ACT_NAMES[k],
     data:  dates.map(d => {
       const e = all[dateStr(d)] || {};
@@ -1128,7 +1142,7 @@ function buildDatasets(all, dates) {
 }
 
 function buildWeekDatasets(all, weeks) {
-  return ['skog','vei','fotball','svom','styrke'].map(k => ({
+  return ['skog','vei','fotball','svom','langrenn','styrke'].map(k => ({
     label: ACT_NAMES[k],
     data:  weeks.map(wDates =>
       wDates.reduce((sum,d) => {
@@ -1140,7 +1154,7 @@ function buildWeekDatasets(all, weeks) {
 }
 
 function buildMonthDatasets(all, yr) {
-  return ['skog','vei','fotball','svom','styrke'].map(k => ({
+  return ['skog','vei','fotball','svom','langrenn','styrke'].map(k => ({
     label: ACT_NAMES[k],
     data:  Array.from({length:12}, (_,mi) =>
       daysInMonth(yr,mi).reduce((sum,d) => {
@@ -1157,7 +1171,8 @@ function calcTotals(entries) {
     vei:     entries.reduce((a,e) => a+(e.vei||0), 0),
     fotball: entries.reduce((a,e) => a+(e.fotball||0), 0),
     svom:    entries.reduce((a,e) => a+(e.svom||0), 0),
-    styrke:  entries.reduce((a,e) => a+(e.styrke||0), 0),
+    styrke:   entries.reduce((a,e) => a+(e.styrke||0), 0),
+    langrenn: entries.reduce((a,e) => a+(e.langrenn||0), 0),
   };
 }
 
@@ -1217,7 +1232,11 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
         <div class="breakdown-name">Svømming</div>
         <div class="breakdown-val">${totals.svom} <span class="breakdown-unit">m</span></div>
       </div>
-      <div class="breakdown-card full-width">
+      <div class="breakdown-card">
+        <div class="breakdown-name">Langrenn</div>
+        <div class="breakdown-val">${fmtKm(totals.langrenn)} <span class="breakdown-unit">km</span></div>
+      </div>
+      <div class="breakdown-card">
         <div class="breakdown-name">Styrke</div>
         <div class="breakdown-val">${totals.styrke} <span class="breakdown-unit">sett</span></div>
       </div>
@@ -1267,7 +1286,7 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
 // ─── HELPERS ───────────────────────────────────────────────────
 function hasAny(e) {
   if (!e) return false;
-  return (e.skog||0)>0 || (e.vei||0)>0 || (e.fotball||0)>0 || (e.svom||0)>0 || (e.styrke||0)>0;
+  return (e.skog||0)>0 || (e.vei||0)>0 || (e.fotball||0)>0 || (e.svom||0)>0 || (e.styrke||0)>0 || (e.langrenn||0)>0;
 }
 
 function daysInMonth(yr, mi) {
