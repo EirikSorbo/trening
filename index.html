@@ -323,7 +323,7 @@ body {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -1029,11 +1029,15 @@ function renderWeekOverview(all) {
   const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
 
+  // For a single week, avg = sessions this week; use all-time avg for context
+  const avgPerWeek = calcAvgPerWeek(all);
+
   renderBody({
     sessions:    totalSessions,
     sessionsSub: 'denne uka',
     kmVal:       totalKm,
     kmSub:       'km denne uka',
+    avgPerWeek,
     chartTitle:  'Aktiviteter per dag',
     chartLabels: dates.map(d => DAYS_NO[(d.getDay()+6)%7]),
     datasets: buildDatasets(all, dates),
@@ -1055,12 +1059,16 @@ function renderMonthOverview(all) {
   const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
   const [, firstWk] = isoWeek(weeks[0][0]);
+  const avgPerWeek = weeks.length > 0
+    ? Math.round((totalSessions / weeks.length) * 10) / 10
+    : 0;
 
   renderBody({
     sessions:    totalSessions,
     sessionsSub: 'denne måneden',
     kmVal:       totalKm,
     kmSub:       'km denne måneden',
+    avgPerWeek,
     chartTitle:  'Aktiviteter per uke',
     chartLabels: weeks.map(w => { const [,wk]=isoWeek(w[0]); return `Uke ${wk}`; }),
     datasets: buildWeekDatasets(all, weeks),
@@ -1078,17 +1086,34 @@ function renderYearOverview(all) {
     .map(([,e]) => e);
   const totalKm  = allEntries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = allEntries.filter(e => hasAny(e)).length;
+  const avgPerWeek = calcAvgPerWeek(all, yr);
 
   renderBody({
     sessions:    totalSessions,
     sessionsSub: 'dette året',
     kmVal:       totalKm,
     kmSub:       'km dette året',
+    avgPerWeek,
     chartTitle:  'Aktiviteter per måned',
     chartLabels: MONTHS_SH,
     datasets: buildMonthDatasets(all, yr),
     totals: calcTotals(allEntries)
   });
+}
+
+// ── AVERAGE PER WEEK ─────────────────────────────────────────
+function calcAvgPerWeek(all, filterYear) {
+  const dates = Object.keys(all).filter(ds => {
+    if (!hasAny(all[ds])) return false;
+    if (filterYear) return ds.startsWith(filterYear + '-');
+    return true;
+  });
+  if (!dates.length) return 0;
+  const weeks = new Set(dates.map(ds => {
+    const [y,wk] = isoWeek(parseDate(ds));
+    return `${y}-W${wk}`;
+  }));
+  return Math.round((dates.length / weeks.size) * 10) / 10;
 }
 
 // ── BUILD DATASETS ───────────────────────────────────────────
@@ -1141,7 +1166,7 @@ function calcTotals(entries) {
 // ── RENDER BODY ───────────────────────────────────────────────
 function fmtKm(v) { return v % 1 === 0 ? String(v) : v.toFixed(1); }
 
-function renderBody({ sessions, sessionsSub, kmVal, kmSub, chartTitle, chartLabels, datasets, totals }) {
+function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitle, chartLabels, datasets, totals }) {
   const body = document.getElementById('overview-body');
 
   body.innerHTML = `
@@ -1155,6 +1180,11 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, chartTitle, chartLabe
         <div class="stat-card-label">Løping</div>
         <div class="stat-card-val">${fmtKm(kmVal)}</div>
         <div class="stat-card-sub">${kmSub}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Gjennomsnitt</div>
+        <div class="stat-card-val">${avgPerWeek}</div>
+        <div class="stat-card-sub">økter per uke</div>
       </div>
     </div>
 
