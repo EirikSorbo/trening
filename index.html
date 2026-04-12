@@ -1059,9 +1059,7 @@ function renderMonthOverview(all) {
   const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
   const [, firstWk] = isoWeek(weeks[0][0]);
-  const avgPerWeek = weeks.length > 0
-    ? Math.round((totalSessions / weeks.length) * 10) / 10
-    : 0;
+  const avgPerWeek = calcAvgPerWeek(all);
 
   renderBody({
     sessions:    totalSessions,
@@ -1086,7 +1084,7 @@ function renderYearOverview(all) {
     .map(([,e]) => e);
   const totalKm  = allEntries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = allEntries.filter(e => hasAny(e)).length;
-  const avgPerWeek = calcAvgPerWeek(all, yr);
+  const avgPerWeek = calcAvgPerWeek(all);
 
   renderBody({
     sessions:    totalSessions,
