@@ -1114,18 +1114,16 @@ function renderYearOverview(all) {
 }
 
 // ── AVERAGE PER WEEK ─────────────────────────────────────────
-function calcAvgPerWeek(all, filterYear) {
-  const dates = Object.keys(all).filter(ds => {
-    if (!hasAny(all[ds])) return false;
-    if (filterYear) return ds.startsWith(filterYear + '-');
-    return true;
-  });
+function calcAvgPerWeek(all) {
+  const dates = Object.keys(all).filter(ds => hasAny(all[ds])).sort();
   if (!dates.length) return 0;
-  const weeks = new Set(dates.map(ds => {
-    const [y,wk] = isoWeek(parseDate(ds));
-    return `${y}-W${wk}`;
-  }));
-  return Math.round((dates.length / weeks.size) * 10) / 10;
+
+  // Weeks elapsed from first session's week up to and including current week
+  const firstMonday  = mondayOf(parseDate(dates[0]));
+  const currentMonday = mondayOf(new Date());
+  const weeksElapsed = Math.round((currentMonday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+
+  return Math.round((dates.length / weeksElapsed) * 10) / 10;
 }
 
 // ── BUILD DATASETS ───────────────────────────────────────────
