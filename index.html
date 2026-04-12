@@ -404,6 +404,81 @@ body {
 
 .empty-msg { text-align: center; padding: 60px 20px; color: var(--muted2); font-size: 13px; line-height: 1.8; }
 
+/* ── CALENDAR ─────────────────────────── */
+.cal-card {
+  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.cal-title {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin-bottom: 10px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-dh {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  text-align: center;
+  padding: 2px 0 6px;
+}
+
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 0 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+  min-height: 36px;
+}
+.cal-cell:active { background: var(--edge); }
+.cal-cell.empty { pointer-events: none; }
+
+.cal-num-wrap {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+.cal-num {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+}
+.cal-cell.is-today .cal-num-wrap { background: var(--ink); }
+.cal-cell.is-today .cal-num { color: var(--surface); }
+
+.cal-dots {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 5px;
+}
+.cal-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* ── PICKER ──────────────────────────── */
 .overlay {
   position: fixed;
@@ -1072,19 +1147,19 @@ function renderMonthOverview(all) {
   const entries  = allDates.map(d => all[dateStr(d)] || {});
   const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
-  const [, firstWk] = isoWeek(weeks[0][0]);
   const avgPerWeek = calcAvgPerWeek(all);
 
   renderBody({
     sessions:    totalSessions,
     sessionsSub: 'denne måneden',
     kmVal:       totalKm,
-    kmSub:       'km denne måneden',
+    kmSub:       'km',
     avgPerWeek,
     chartTitle:  'Aktiviteter per uke',
     chartLabels: weeks.map(w => { const [,wk]=isoWeek(w[0]); return `Uke ${wk}`; }),
     datasets: buildWeekDatasets(all, weeks),
-    totals: calcTotals(entries)
+    totals: calcTotals(entries),
+    calData: { yr, mi: target.getMonth(), all }
   });
 }
 
@@ -1163,6 +1238,46 @@ function buildMonthDatasets(all, yr) {
   }));
 }
 
+// ── CALENDAR HTML ────────────────────────────────────────────
+function buildCalHtml({ yr, mi, all }) {
+  const TODAY_STR = dateStr(new Date());
+  const firstWd   = new Date(yr, mi, 1).getDay();
+  const offset    = firstWd === 0 ? 6 : firstWd - 1;
+  const daysInMo  = new Date(yr, mi + 1, 0).getDate();
+  const ACTS_CAL  = ['skog','vei','fotball','svom','langrenn','styrke'];
+
+  let cells = '';
+  for (let i = 0; i < offset; i++) {
+    cells += '<div class="cal-cell empty"></div>';
+  }
+  for (let day = 1; day <= daysInMo; day++) {
+    const key = `${yr}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const e   = all[key] || {};
+    const isToday = key === TODAY_STR;
+
+    const dots = ACTS_CAL
+      .filter(k => k === 'styrke' ? (e.styrke||0) > 0 : (e[k]||0) > 0)
+      .map(k => `<div class="cal-dot" style="background:${ACT_COLORS[k]}"></div>`)
+      .join('');
+
+    cells += `
+      <div class="cal-cell${isToday ? ' is-today' : ''}">
+        <div class="cal-num-wrap"><span class="cal-num">${day}</span></div>
+        <div class="cal-dots">${dots}</div>
+      </div>`;
+  }
+
+  const headers = ['M','T','O','T','F','L','S']
+    .map(h => `<div class="cal-dh">${h}</div>`).join('');
+
+  return `
+    <div class="cal-card">
+      <div class="cal-title">${MONTHS_NO[mi]} ${yr}</div>
+      <div class="cal-grid">${headers}${cells}</div>
+    </div>`;
+}
+
+
 function calcTotals(entries) {
   return {
     skog:    entries.reduce((a,e) => a+(e.skog||0), 0),
@@ -1177,8 +1292,10 @@ function calcTotals(entries) {
 // ── RENDER BODY ───────────────────────────────────────────────
 function fmtKm(v) { return v % 1 === 0 ? String(v) : v.toFixed(1); }
 
-function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitle, chartLabels, datasets, totals }) {
+function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitle, chartLabels, datasets, totals, calData }) {
   const body = document.getElementById('overview-body');
+
+  const calHtml = calData ? buildCalHtml(calData) : '';
 
   body.innerHTML = `
     <div class="stat-grid">
@@ -1199,11 +1316,13 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
       </div>
     </div>
 
+    ${calHtml}
+
     <div class="chart-card">
       <div class="chart-title">${chartTitle}</div>
       <div class="chart-wrap"><canvas id="main-chart"></canvas></div>
       <div class="legend">
-        ${['skog','vei','fotball','svom','styrke'].map(k => `
+        ${['skog','vei','fotball','svom','langrenn','styrke'].map(k => `
           <div class="leg">
             <div class="leg-dot" style="background:${ACT_COLORS[k]}"></div>
             ${ACT_NAMES[k]}
