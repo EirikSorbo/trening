@@ -653,7 +653,7 @@ body {
     <div class="date-heading" id="date-heading">—</div>
 
     <div class="activity-card">
-      <span class="act-name">Løping i skog</span>
+      <span class="act-name">Løping</span>
       <div class="act-input">
         <button class="val-tap empty" id="tap-skog" onclick="openPicker('skog')">—</button>
         <span class="act-unit">km</span>
@@ -661,7 +661,7 @@ body {
     </div>
 
     <div class="activity-card">
-      <span class="act-name">Løping på vei</span>
+      <span class="act-name">Sykling</span>
       <div class="act-input">
         <button class="val-tap empty" id="tap-vei" onclick="openPicker('vei')">—</button>
         <span class="act-unit">km</span>
@@ -762,7 +762,7 @@ const ACT_COLORS = {
   skog:'#4a9e78', vei:'#3d7cb5', fotball:'#c49a3d', svom:'#e07840', styrke:'#9e5a7a', langrenn:'#7a5a9e'
 };
 const ACT_NAMES = {
-  skog:'Løping i skog', vei:'Løping på vei', fotball:'Fotball', svom:'Svømming', styrke:'Styrke', langrenn:'Langrenn'
+  skog:'Løping', vei:'Sykling', fotball:'Fotball', svom:'Svømming', styrke:'Styrke', langrenn:'Langrenn'
 };
 const ACT_UNITS = { skog:'km', vei:'km', fotball:'min', svom:'m', styrke:'sett', langrenn:'km' };
 
@@ -934,11 +934,11 @@ const PICKER_DEFAULTS = { skog:5, vei:5, fotball:55, svom:1800, langrenn:10 };
 
 const PICKER_CONFIG = {
   skog: {
-    type: 'km', label: 'Løping i skog',
+    type: 'km', label: 'Løping',
     leftUnit: 'km', sep: '.', rightUnit: 'des'
   },
   vei: {
-    type: 'km', label: 'Løping på vei',
+    type: 'km', label: 'Sykling',
     leftUnit: 'km', sep: '.', rightUnit: 'des'
   },
   fotball: {
@@ -1334,11 +1334,11 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
     <div class="breakdown-section-label">Totaler for perioden</div>
     <div class="breakdown-grid">
       <div class="breakdown-card">
-        <div class="breakdown-name">Løping i skog</div>
+        <div class="breakdown-name">Løping</div>
         <div class="breakdown-val">${fmtKm(totals.skog)} <span class="breakdown-unit">km</span></div>
       </div>
       <div class="breakdown-card">
-        <div class="breakdown-name">Løping på vei</div>
+        <div class="breakdown-name">Sykling</div>
         <div class="breakdown-val">${fmtKm(totals.vei)} <span class="breakdown-unit">km</span></div>
       </div>
       <div class="breakdown-card">
