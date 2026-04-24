@@ -203,7 +203,7 @@ body {
   width: 36px;
 }
 
-/* Value tap button (scroll picker trigger) */
+/* Value tap button */
 .val-tap {
   background: var(--surface);
   border: 1px solid var(--edge);
@@ -368,7 +368,27 @@ body {
 .chart-wrap { position: relative; height: 100px; }
 
 .legend { display: flex; gap: 8px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
-.leg { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--muted); letter-spacing: 0.03em; }
+.leg {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+}
+.leg:hover { color: var(--ink); border-color: var(--edge); }
+.leg.filter-on {
+  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--surface);
+  font-weight: 600;
+}
 .leg-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
 
 .breakdown-section-label {
@@ -382,15 +402,30 @@ body {
   border-bottom: 1px solid var(--edge);
 }
 
-.breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* ── 3-column breakdown grid ─── */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
 
 .breakdown-card {
   background: var(--paper);
   border: 1px solid var(--edge);
   border-radius: var(--r);
   padding: 9px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
 }
-.breakdown-card.full-width { grid-column: 1 / -1; }
+.breakdown-card:hover { border-color: var(--muted2); }
+.breakdown-card.filter-on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.breakdown-card.filter-on .breakdown-name { color: var(--accent2); }
+.breakdown-card.filter-on .breakdown-val { color: var(--surface); }
+.breakdown-card.filter-on .breakdown-unit { color: var(--muted2); }
 
 .breakdown-name {
   font-size: 9px;
@@ -398,9 +433,26 @@ body {
   text-transform: uppercase;
   color: var(--muted2);
   margin-bottom: 3px;
+  transition: color 0.15s;
 }
-.breakdown-val { font-size: 18px; font-weight: 600; color: var(--ink); line-height: 1; }
-.breakdown-unit { font-size: 9px; color: var(--muted2); font-weight: 400; }
+.breakdown-val {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+  transition: color 0.15s;
+}
+.breakdown-unit { font-size: 9px; color: var(--muted2); font-weight: 400; transition: color 0.15s; }
+
+.filter-hint {
+  text-align: center;
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+  min-height: 14px;
+  text-transform: uppercase;
+}
 
 .empty-msg { text-align: center; padding: 60px 20px; color: var(--muted2); font-size: 13px; line-height: 1.8; }
 
@@ -538,7 +590,6 @@ body {
   position: relative;
 }
 
-/* selection highlight bar — spans both wheels */
 .picker-wheels::before {
   content: '';
   position: absolute;
@@ -576,7 +627,6 @@ body {
   user-select: none;
   padding: 0 4px;
   align-self: center;
-  /* nudge down to align with wheel mid-point, accounting for unit label */
   margin-top: 26px;
 }
 
@@ -591,6 +641,7 @@ body {
 .wheel.narrow { width: 64px; }
 .wheel::-webkit-scrollbar { display: none; }
 
+/* No fixed spacers anymore — we use JS padding items */
 .wheel-spacer { height: 92px; }
 
 .wheel-item {
@@ -766,6 +817,9 @@ const ACT_NAMES = {
 };
 const ACT_UNITS = { skog:'km', vei:'km', fotball:'min', svom:'m', styrke:'sett', langrenn:'km' };
 
+// Styrke only shows in overview if total > 60 (>3 clicks of 20)
+const STYRKE_OVERVIEW_THRESHOLD = 60;
+
 // ─── STORAGE ───────────────────────────────────────────────────
 function loadAll() { try { return JSON.parse(localStorage.getItem('treningslogg_v2') || '{}'); } catch { return {}; } }
 function persistAll(d) { localStorage.setItem('treningslogg_v2', JSON.stringify(d)); }
@@ -801,6 +855,8 @@ let chartInst     = null;
 let currentPeriod = 'uke';
 let periodOffset  = 0;
 let pField        = null;
+let activeFilter  = null;   // key of active category filter, or null
+let lastRenderParams = null;
 
 function blank() { return { skog:0, vei:0, fotball:0, svom:0, styrke:0, langrenn:0 }; }
 
@@ -810,7 +866,10 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.querySelectorAll('.tab-btn')[tab === 'reg' ? 0 : 1].classList.add('active');
-  if (tab === 'oversikt') renderOverview();
+  if (tab === 'oversikt') {
+    activeFilter = null;
+    renderOverview();
+  }
 }
 
 // ─── WEEK NAVIGATION ───────────────────────────────────────────
@@ -843,12 +902,9 @@ function renderStrip() {
     strip.appendChild(btn);
   });
 
-  const weekDs = dates.map(dateStr);
-  if (weekDs.includes(activeDate)) {
-    const pd = parseDate(activeDate);
-    document.getElementById('date-heading').textContent =
-      `${DAYS_LONG[(pd.getDay()+6)%7]} ${pd.getDate()}. ${MONTHS_NO[pd.getMonth()].toLowerCase()}`;
-  }
+  const pd = parseDate(activeDate);
+  document.getElementById('date-heading').textContent =
+    `${DAYS_LONG[(pd.getDay()+6)%7]} ${pd.getDate()}. ${MONTHS_NO[pd.getMonth()].toLowerCase()}`;
 }
 
 function selectDate(ds) {
@@ -878,15 +934,12 @@ function renderForm() {
     }
   });
 
-  // Fotball: stored as total minutes, display as h:mm
   const tapFotball = document.getElementById('tap-fotball');
   const fotballMin = form.fotball || 0;
   if (fotballMin > 0) {
     const h  = Math.floor(fotballMin / 60);
     const m  = fotballMin % 60;
-    tapFotball.textContent = h > 0
-      ? `${h}:${String(m).padStart(2,'0')}`
-      : String(m);
+    tapFotball.textContent = `${h}:${String(m).padStart(2,'0')}`;
     tapFotball.classList.remove('empty');
   } else {
     tapFotball.textContent = '—';
@@ -912,8 +965,9 @@ function saveDay() {
   showStatus('Lagret');
 }
 
+// ── CHANGE 2: Styrke increments of 20 ──
 function changeStyrke(d) {
-  form.styrke = Math.max(0, (form.styrke || 0) + d);
+  form.styrke = Math.max(0, (form.styrke || 0) + d * 20);
   document.getElementById('val-styrke').textContent = form.styrke;
   saveDay();
 }
@@ -922,15 +976,10 @@ function clearDay() {
   form = blank();
   renderForm();
   saveDay();
-  document.getElementById('status-msg').textContent = '';
 }
 
 // ─── PICKER CONFIG ─────────────────────────────────────────────
-// Default wheel positions when field is empty (0)
 const PICKER_DEFAULTS = { skog:5, vei:13.4, fotball:55, svom:1800, langrenn:10 };
-// type 'km'    → left: whole km (0–30), right: tenths (0 or 5)
-// type 'hhmm'  → left: hours (0–3), right: minutes (0,5,10…55)
-// type 'single'→ left wheel only
 
 const PICKER_CONFIG = {
   skog: {
@@ -970,7 +1019,7 @@ function openPicker(field) {
   if (cfg.type === 'km') {
     const val   = form[field] || PICKER_DEFAULTS[field];
     const whole = Math.floor(val);
-    const dec   = Math.round((val - whole) * 10); // 0–9
+    const dec   = Math.round((val - whole) * 10);
 
     unitL.textContent = cfg.leftUnit;
     buildWheel('wheel-left',
@@ -988,7 +1037,7 @@ function openPicker(field) {
     const val    = form[field] || PICKER_DEFAULTS[field];
     const hours  = Math.floor(val / 60);
     const mins   = val % 60;
-    const minIdx = Math.round(mins / 5);
+    const minIdx = Math.min(Math.round(mins / 5), 11);
 
     unitL.textContent = cfg.leftUnit;
     buildWheel('wheel-left',
@@ -1002,7 +1051,7 @@ function openPicker(field) {
       Array.from({length:12}, (_,i) => ({val:i*5, label:String(i*5).padStart(2,'0')})),
       minIdx);
 
-  } else { // single
+  } else {
     unitL.textContent = cfg.leftUnit;
     const curVal = form[field] || PICKER_DEFAULTS[field] || 0;
     const idx    = cfg.vals.findIndex(v => Math.abs(v.val - curVal) < 0.01);
@@ -1014,38 +1063,73 @@ function openPicker(field) {
   document.getElementById('picker-overlay').classList.add('open');
 }
 
+// ── Infinite-scroll wheels ──
 function buildWheel(id, items, selIdx) {
-  const w = document.getElementById(id);
+  const w    = document.getElementById(id);
+  const REPS = 5;
+  const n    = items.length;
+  const mid  = Math.floor(REPS / 2) * n;
+
   w.innerHTML = '';
-  const top = document.createElement('div'); top.className = 'wheel-spacer'; w.appendChild(top);
-  items.forEach((item, i) => {
-    const el = document.createElement('div');
-    el.className = 'wheel-item';
-    el.textContent = item.label;
-    el.dataset.val = item.val;
-    el.dataset.idx = i;
-    w.appendChild(el);
-  });
-  const bot = document.createElement('div'); bot.className = 'wheel-spacer'; w.appendChild(bot);
+  w.dataset.n   = n;
+  w.dataset.mid = mid;
+
+  const top = document.createElement('div');
+  top.className = 'wheel-spacer';
+  w.appendChild(top);
+
+  for (let r = 0; r < REPS; r++) {
+    items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'wheel-item';
+      el.textContent = item.label;
+      el.dataset.val = item.val;
+      w.appendChild(el);
+    });
+  }
+
+  const bot = document.createElement('div');
+  bot.className = 'wheel-spacer';
+  w.appendChild(bot);
 
   let timer;
+  let suppressUntil = 0;
+
+  function doSnap() {
+    const rawIdx    = Math.round(w.scrollTop / 46);
+    const pos       = ((rawIdx % n) + n) % n;
+    const targetIdx = mid + pos;
+
+    if (rawIdx !== targetIdx) {
+      // Jump to middle-rep equivalent, suppress re-entry briefly
+      suppressUntil = Date.now() + 100;
+      w.scrollTo({ top: targetIdx * 46, behavior: 'instant' });
+      // Re-snap after jump to ensure we land on an item boundary
+      setTimeout(() => {
+        const snapped = Math.round(w.scrollTop / 46);
+        w.scrollTo({ top: snapped * 46, behavior: 'smooth' });
+      }, 30);
+    } else {
+      w.scrollTo({ top: rawIdx * 46, behavior: 'smooth' });
+    }
+  }
+
   w.onscroll = () => {
+    if (Date.now() < suppressUntil) return;
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      const snapped = Math.round(w.scrollTop / 46);
-      w.scrollTo({ top: snapped * 46, behavior: 'smooth' });
-    }, 120);
+    timer = setTimeout(doSnap, 120);
   };
 
-  const safeIdx = Math.max(0, Math.min(selIdx || 0, items.length - 1));
-  requestAnimationFrame(() => w.scrollTo({ top: safeIdx * 46, behavior: 'instant' }));
+  const safeIdx = Math.max(0, Math.min(selIdx || 0, n - 1));
+  requestAnimationFrame(() => w.scrollTo({ top: (mid + safeIdx) * 46, behavior: 'instant' }));
 }
 
 function getWheelItemVal(id) {
-  const w     = document.getElementById(id);
-  const idx   = Math.round(w.scrollTop / 46);
-  const items = w.querySelectorAll('.wheel-item');
-  return items[idx] ? parseFloat(items[idx].dataset.val) : 0;
+  const w        = document.getElementById(id);
+  const idx      = Math.round(w.scrollTop / 46);
+  const allItems = w.querySelectorAll('.wheel-item');
+  if (!allItems[idx]) return 0;
+  return parseFloat(allItems[idx].dataset.val);
 }
 
 function closePicker(save) {
@@ -1053,7 +1137,7 @@ function closePicker(save) {
     const cfg = PICKER_CONFIG[pField];
     if (cfg.type === 'km') {
       const whole = getWheelItemVal('wheel-left');
-      const dec   = getWheelItemVal('wheel-right'); // 0–9 tenths digit
+      const dec   = getWheelItemVal('wheel-right');
       form[pField] = parseFloat((whole + dec / 10).toFixed(1));
     } else if (cfg.type === 'hhmm') {
       const hours = getWheelItemVal('wheel-left');
@@ -1088,15 +1172,27 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+// ── CHANGE 4: Category filter toggle ──
+function toggleFilter(k) {
+  activeFilter = (activeFilter === k) ? null : k;
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  if (lastRenderParams) renderBody(lastRenderParams);
+}
+
 // ─── OVERVIEW ──────────────────────────────────────────────────
 function setPeriod(p) {
   currentPeriod = p; periodOffset = 0;
+  activeFilter = null;
   document.querySelectorAll('.period-tab').forEach((btn, i) =>
     btn.classList.toggle('active', ['uke','maned','ar'][i] === p));
   renderOverview();
 }
 
-function changePeriod(d) { periodOffset += d; renderOverview(); }
+function changePeriod(d) {
+  periodOffset += d;
+  activeFilter = null;
+  renderOverview();
+}
 
 function renderOverview() {
   if (chartInst) { chartInst.destroy(); chartInst = null; }
@@ -1110,16 +1206,14 @@ function renderOverview() {
 function renderWeekOverview(all) {
   const ws = mondayOf(new Date());
   ws.setDate(ws.getDate() + periodOffset * 7);
-  const dates   = Array.from({length:7}, (_, i) => { const d = new Date(ws); d.setDate(ws.getDate()+i); return d; });
+  const dates    = Array.from({length:7}, (_, i) => { const d = new Date(ws); d.setDate(ws.getDate()+i); return d; });
   const [yr, wk] = isoWeek(dates[0]);
   document.getElementById('period-label').textContent = `Uke ${wk} · ${yr}`;
 
-  const entries  = dates.map(d => all[dateStr(d)] || {});
-  const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
+  const entries       = dates.map(d => all[dateStr(d)] || {});
+  const totalKm       = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
-
-  // For a single week, avg = sessions this week; use all-time avg for context
-  const avgPerWeek = calcAvgPerWeek(all);
+  const avgPerWeek    = calcAvgPerWeek(all);
 
   renderBody({
     sessions:    totalSessions,
@@ -1129,8 +1223,8 @@ function renderWeekOverview(all) {
     avgPerWeek,
     chartTitle:  'Aktiviteter per dag',
     chartLabels: dates.map(d => DAYS_NO[(d.getDay()+6)%7]),
-    datasets: buildDatasets(all, dates),
-    totals: calcTotals(entries)
+    datasets:    buildDatasets(all, dates),
+    totals:      calcTotals(entries)
   });
 }
 
@@ -1157,9 +1251,9 @@ function renderMonthOverview(all) {
     avgPerWeek,
     chartTitle:  'Aktiviteter per uke',
     chartLabels: weeks.map(w => { const [,wk]=isoWeek(w[0]); return `Uke ${wk}`; }),
-    datasets: buildWeekDatasets(all, weeks),
-    totals: calcTotals(entries),
-    calData: { yr, mi: target.getMonth(), all }
+    datasets:    buildWeekDatasets(all, weeks),
+    totals:      calcTotals(entries),
+    calData:     { yr, mi: target.getMonth(), all }
   });
 }
 
@@ -1168,12 +1262,12 @@ function renderYearOverview(all) {
   const yr = new Date().getFullYear() + periodOffset;
   document.getElementById('period-label').textContent = String(yr);
 
-  const allEntries = Object.entries(all)
+  const allEntries    = Object.entries(all)
     .filter(([ds]) => ds.startsWith(yr + '-'))
     .map(([,e]) => e);
-  const totalKm  = allEntries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
+  const totalKm       = allEntries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
   const totalSessions = allEntries.filter(e => hasAny(e)).length;
-  const avgPerWeek = calcAvgPerWeek(all);
+  const avgPerWeek    = calcAvgPerWeek(all);
 
   renderBody({
     sessions:    totalSessions,
@@ -1183,8 +1277,8 @@ function renderYearOverview(all) {
     avgPerWeek,
     chartTitle:  'Aktiviteter per måned',
     chartLabels: MONTHS_SH,
-    datasets: buildMonthDatasets(all, yr),
-    totals: calcTotals(allEntries)
+    datasets:    buildMonthDatasets(all, yr),
+    totals:      calcTotals(allEntries)
   });
 }
 
@@ -1192,23 +1286,20 @@ function renderYearOverview(all) {
 function calcAvgPerWeek(all) {
   const dates = Object.keys(all).filter(ds => hasAny(all[ds])).sort();
   if (!dates.length) return 0;
-
-  // Weeks elapsed from first session's week up to and including current week
-  const firstMonday  = mondayOf(parseDate(dates[0]));
+  const firstMonday   = mondayOf(parseDate(dates[0]));
   const currentMonday = mondayOf(new Date());
-  const weeksElapsed = Math.round((currentMonday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
-
+  const weeksElapsed  = Math.round((currentMonday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
   return Math.round((dates.length / weeksElapsed) * 10) / 10;
 }
 
-// ── BUILD DATASETS ───────────────────────────────────────────
+// ── BUILD DATASETS ── styrke only if > STYRKE_OVERVIEW_THRESHOLD
 function buildDatasets(all, dates) {
   return ['skog','vei','fotball','svom','langrenn','styrke'].map(k => ({
     label: ACT_NAMES[k],
     data:  dates.map(d => {
       const e = all[dateStr(d)] || {};
-      return k === 'styrke' ? (e.styrke||0) > 0 ? 1 : 0
-                            : (e[k]||0) > 0 ? 1 : 0;
+      if (k === 'styrke') return (e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD ? 1 : 0;
+      return (e[k]||0) > 0 ? 1 : 0;
     }),
     color: ACT_COLORS[k]
   }));
@@ -1220,7 +1311,8 @@ function buildWeekDatasets(all, weeks) {
     data:  weeks.map(wDates =>
       wDates.reduce((sum,d) => {
         const e = all[dateStr(d)] || {};
-        return sum + ((k==='styrke' ? (e.styrke||0) : (e[k]||0)) > 0 ? 1 : 0);
+        if (k === 'styrke') return sum + ((e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD ? 1 : 0);
+        return sum + ((e[k]||0) > 0 ? 1 : 0);
       }, 0)),
     color: ACT_COLORS[k]
   }));
@@ -1232,13 +1324,14 @@ function buildMonthDatasets(all, yr) {
     data:  Array.from({length:12}, (_,mi) =>
       daysInMonth(yr,mi).reduce((sum,d) => {
         const e = all[dateStr(d)] || {};
-        return sum + ((k==='styrke' ? (e.styrke||0) : (e[k]||0)) > 0 ? 1 : 0);
+        if (k === 'styrke') return sum + ((e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD ? 1 : 0);
+        return sum + ((e[k]||0) > 0 ? 1 : 0);
       }, 0)),
     color: ACT_COLORS[k]
   }));
 }
 
-// ── CALENDAR HTML ────────────────────────────────────────────
+// ── CALENDAR HTML — styrke dot only if > threshold ───────────
 function buildCalHtml({ yr, mi, all }) {
   const TODAY_STR = dateStr(new Date());
   const firstWd   = new Date(yr, mi, 1).getDay();
@@ -1247,16 +1340,20 @@ function buildCalHtml({ yr, mi, all }) {
   const ACTS_CAL  = ['skog','vei','fotball','svom','langrenn','styrke'];
 
   let cells = '';
-  for (let i = 0; i < offset; i++) {
-    cells += '<div class="cal-cell empty"></div>';
-  }
+  for (let i = 0; i < offset; i++) cells += '<div class="cal-cell empty"></div>';
+
   for (let day = 1; day <= daysInMo; day++) {
-    const key = `${yr}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const e   = all[key] || {};
+    const key     = `${yr}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const e       = all[key] || {};
     const isToday = key === TODAY_STR;
 
     const dots = ACTS_CAL
-      .filter(k => k === 'styrke' ? (e.styrke||0) > 0 : (e[k]||0) > 0)
+      .filter(k => {
+        if (k === 'styrke') return (e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD;
+        return (e[k]||0) > 0;
+      })
+      // If filter active, only show matching dot
+      .filter(k => !activeFilter || k === activeFilter)
       .map(k => `<div class="cal-dot" style="background:${ACT_COLORS[k]}"></div>`)
       .join('');
 
@@ -1277,26 +1374,64 @@ function buildCalHtml({ yr, mi, all }) {
     </div>`;
 }
 
-
 function calcTotals(entries) {
   return {
-    skog:    entries.reduce((a,e) => a+(e.skog||0), 0),
-    vei:     entries.reduce((a,e) => a+(e.vei||0), 0),
-    fotball: entries.reduce((a,e) => a+(e.fotball||0), 0),
-    svom:    entries.reduce((a,e) => a+(e.svom||0), 0),
+    skog:     entries.reduce((a,e) => a+(e.skog||0), 0),
+    vei:      entries.reduce((a,e) => a+(e.vei||0), 0),
+    fotball:  entries.reduce((a,e) => a+(e.fotball||0), 0),
+    svom:     entries.reduce((a,e) => a+(e.svom||0), 0),
     styrke:   entries.reduce((a,e) => a+(e.styrke||0), 0),
     langrenn: entries.reduce((a,e) => a+(e.langrenn||0), 0),
   };
 }
 
-// ── RENDER BODY ───────────────────────────────────────────────
+// ── CHANGE 3 + 4: Render body with 3-col grid and filter ─────
 function fmtKm(v) { return v % 1 === 0 ? String(v) : v.toFixed(1); }
+function fmtVal(v, decimals) {
+  if (!v || v === 0) return '—';
+  return decimals ? fmtKm(v) : String(v);
+}
 
-function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitle, chartLabels, datasets, totals, calData }) {
-  const body = document.getElementById('overview-body');
+function renderBody(params) {
+  lastRenderParams = params;
+  const { sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitle, chartLabels, datasets, totals, calData } = params;
+
+  // Apply category filter to chart datasets
+  const visibleDatasets = activeFilter
+    ? datasets.filter(ds => ds.label === ACT_NAMES[activeFilter])
+    : datasets;
+
+  const filterHint = activeFilter
+    ? `Filtrert: ${ACT_NAMES[activeFilter]} — klikk igjen for å nullstille`
+    : '';
 
   const calHtml = calData ? buildCalHtml(calData) : '';
 
+  // Breakdown cards — 6 items in 3-col grid (2 rows of 3)
+  const breakdownItems = [
+    { k:'skog',     val: fmtVal(totals.skog,     true),  unit:'km'  },
+    { k:'vei',      val: fmtVal(totals.vei,      true),  unit:'km'  },
+    { k:'fotball',  val: fmtVal(totals.fotball,  false), unit:'min' },
+    { k:'svom',     val: fmtVal(totals.svom,     false), unit:'m'   },
+    { k:'langrenn', val: fmtVal(totals.langrenn, true),  unit:'km'  },
+    { k:'styrke',   val: fmtVal(totals.styrke,   false), unit:'sett'},
+  ];
+
+  const breakdownHtml = breakdownItems.map(({ k, val, unit }) => `
+    <div class="breakdown-card${activeFilter === k ? ' filter-on' : ''}" onclick="toggleFilter('${k}')">
+      <div class="breakdown-name">${ACT_NAMES[k]}</div>
+      <div class="breakdown-val">${val}${val !== '—' ? ` <span class="breakdown-unit">${unit}</span>` : ''}</div>
+    </div>
+  `).join('');
+
+  const legendHtml = ['skog','vei','fotball','svom','langrenn','styrke'].map(k => `
+    <div class="leg${activeFilter === k ? ' filter-on' : ''}" onclick="toggleFilter('${k}')">
+      <div class="leg-dot" style="background:${ACT_COLORS[k]}"></div>
+      ${ACT_NAMES[k]}
+    </div>
+  `).join('');
+
+  const body = document.getElementById('overview-body');
   body.innerHTML = `
     <div class="stat-grid">
       <div class="stat-card">
@@ -1305,7 +1440,7 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
         <div class="stat-card-sub">${sessionsSub}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-label">Løping</div>
+        <div class="stat-card-label">Løping + sykkel</div>
         <div class="stat-card-val">${fmtKm(kmVal)}</div>
         <div class="stat-card-sub">${kmSub}</div>
       </div>
@@ -1321,50 +1456,19 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
     <div class="chart-card">
       <div class="chart-title">${chartTitle}</div>
       <div class="chart-wrap"><canvas id="main-chart"></canvas></div>
-      <div class="legend">
-        ${['skog','vei','fotball','svom','langrenn','styrke'].map(k => `
-          <div class="leg">
-            <div class="leg-dot" style="background:${ACT_COLORS[k]}"></div>
-            ${ACT_NAMES[k]}
-          </div>
-        `).join('')}
-      </div>
+      <div class="legend">${legendHtml}</div>
+      <div class="filter-hint">${filterHint}</div>
     </div>
 
     <div class="breakdown-section-label">Totaler for perioden</div>
-    <div class="breakdown-grid">
-      <div class="breakdown-card">
-        <div class="breakdown-name">Løping</div>
-        <div class="breakdown-val">${fmtKm(totals.skog)} <span class="breakdown-unit">km</span></div>
-      </div>
-      <div class="breakdown-card">
-        <div class="breakdown-name">Sykling</div>
-        <div class="breakdown-val">${fmtKm(totals.vei)} <span class="breakdown-unit">km</span></div>
-      </div>
-      <div class="breakdown-card">
-        <div class="breakdown-name">Fotball</div>
-        <div class="breakdown-val">${totals.fotball} <span class="breakdown-unit">min</span></div>
-      </div>
-      <div class="breakdown-card">
-        <div class="breakdown-name">Svømming</div>
-        <div class="breakdown-val">${totals.svom} <span class="breakdown-unit">m</span></div>
-      </div>
-      <div class="breakdown-card">
-        <div class="breakdown-name">Langrenn</div>
-        <div class="breakdown-val">${fmtKm(totals.langrenn)} <span class="breakdown-unit">km</span></div>
-      </div>
-      <div class="breakdown-card">
-        <div class="breakdown-name">Styrke</div>
-        <div class="breakdown-val">${totals.styrke} <span class="breakdown-unit">sett</span></div>
-      </div>
-    </div>
+    <div class="breakdown-grid">${breakdownHtml}</div>
   `;
 
   chartInst = new Chart(document.getElementById('main-chart').getContext('2d'), {
     type: 'bar',
     data: {
       labels: chartLabels,
-      datasets: datasets.map(ds => ({
+      datasets: visibleDatasets.map(ds => ({
         label: ds.label,
         data: ds.data,
         backgroundColor: ds.color + 'cc',
@@ -1390,7 +1494,7 @@ function renderBody({ sessions, sessionsSub, kmVal, kmSub, avgPerWeek, chartTitl
             stepSize: 1,
             color: '#8a8a9a',
             font: { size: 9, family: 'Geist Mono' },
-            callback: v => Number.isInteger(v) && v >= 2 ? v : null
+            callback: v => Number.isInteger(v) && v >= 1 ? v : null
           },
           grid: { color: 'rgba(0,0,0,0.04)' },
           border: { color: '#e2ddd6' }
