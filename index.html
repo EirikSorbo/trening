@@ -367,10 +367,11 @@ body {
 
 .chart-wrap { position: relative; height: 100px; }
 
-.legend { display: flex; gap: 8px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+.legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 6px; margin-top: 8px; }
 .leg {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   font-size: 9px;
   color: var(--muted);
