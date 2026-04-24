@@ -1211,7 +1211,7 @@ function renderWeekOverview(all) {
   document.getElementById('period-label').textContent = `Uke ${wk} · ${yr}`;
 
   const entries       = dates.map(d => all[dateStr(d)] || {});
-  const totalKm       = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
+  const totalKm       = entries.reduce((a,e) => a+(e.skog||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
   const avgPerWeek    = calcAvgPerWeek(all);
 
@@ -1239,7 +1239,7 @@ function renderMonthOverview(all) {
   const weeks    = getWeeksInMonth(target);
   const allDates = weeks.flat().filter(d => d.getMonth() === target.getMonth() && d.getFullYear() === yr);
   const entries  = allDates.map(d => all[dateStr(d)] || {});
-  const totalKm  = entries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
+  const totalKm  = entries.reduce((a,e) => a+(e.skog||0), 0);
   const totalSessions = entries.filter(e => hasAny(e)).length;
   const avgPerWeek = calcAvgPerWeek(all);
 
@@ -1265,7 +1265,7 @@ function renderYearOverview(all) {
   const allEntries    = Object.entries(all)
     .filter(([ds]) => ds.startsWith(yr + '-'))
     .map(([,e]) => e);
-  const totalKm       = allEntries.reduce((a,e) => a+(e.skog||0)+(e.vei||0), 0);
+  const totalKm       = allEntries.reduce((a,e) => a+(e.skog||0), 0);
   const totalSessions = allEntries.filter(e => hasAny(e)).length;
   const avgPerWeek    = calcAvgPerWeek(all);
 
@@ -1440,7 +1440,7 @@ function renderBody(params) {
         <div class="stat-card-sub">${sessionsSub}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-label">Løping + sykkel</div>
+        <div class="stat-card-label">Løping</div>
         <div class="stat-card-val">${fmtKm(kmVal)}</div>
         <div class="stat-card-sub">${kmSub}</div>
       </div>
