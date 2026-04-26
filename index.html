@@ -816,10 +816,10 @@ const ACT_COLORS = {
 const ACT_NAMES = {
   skog:'Løping', vei:'Sykling', fotball:'Fotball', svom:'Svømming', styrke:'Styrke', langrenn:'Langrenn'
 };
-const ACT_UNITS = { skog:'km', vei:'km', fotball:'min', svom:'m', styrke:'sett', langrenn:'km' };
+const ACT_UNITS = { skog:'km', vei:'km', fotball:'min', svom:'m', styrke:'enheter', langrenn:'km' };
 
-// Styrke only shows in overview if total > 60 (>3 clicks of 20)
-const STYRKE_OVERVIEW_THRESHOLD = 60;
+// Styrke only shows dots/bars in overview if >= 100 enheter per day
+const STYRKE_OVERVIEW_THRESHOLD = 100;
 
 // ─── STORAGE ───────────────────────────────────────────────────
 function loadAll() { try { return JSON.parse(localStorage.getItem('treningslogg_v2') || '{}'); } catch { return {}; } }
@@ -1299,7 +1299,7 @@ function buildDatasets(all, dates) {
     label: ACT_NAMES[k],
     data:  dates.map(d => {
       const e = all[dateStr(d)] || {};
-      if (k === 'styrke') return (e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD ? 1 : 0;
+      if (k === 'styrke') return (e.styrke||0) >= STYRKE_OVERVIEW_THRESHOLD ? 1 : 0;
       return (e[k]||0) > 0 ? 1 : 0;
     }),
     color: ACT_COLORS[k]
@@ -1312,7 +1312,7 @@ function buildWeekDatasets(all, weeks) {
     data:  weeks.map(wDates =>
       wDates.reduce((sum,d) => {
         const e = all[dateStr(d)] || {};
-        if (k === 'styrke') return sum + ((e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD ? 1 : 0);
+        if (k === 'styrke') return sum + ((e.styrke||0) >= STYRKE_OVERVIEW_THRESHOLD ? 1 : 0);
         return sum + ((e[k]||0) > 0 ? 1 : 0);
       }, 0)),
     color: ACT_COLORS[k]
@@ -1325,7 +1325,7 @@ function buildMonthDatasets(all, yr) {
     data:  Array.from({length:12}, (_,mi) =>
       daysInMonth(yr,mi).reduce((sum,d) => {
         const e = all[dateStr(d)] || {};
-        if (k === 'styrke') return sum + ((e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD ? 1 : 0);
+        if (k === 'styrke') return sum + ((e.styrke||0) >= STYRKE_OVERVIEW_THRESHOLD ? 1 : 0);
         return sum + ((e[k]||0) > 0 ? 1 : 0);
       }, 0)),
     color: ACT_COLORS[k]
@@ -1350,7 +1350,7 @@ function buildCalHtml({ yr, mi, all }) {
 
     const dots = ACTS_CAL
       .filter(k => {
-        if (k === 'styrke') return (e.styrke||0) > STYRKE_OVERVIEW_THRESHOLD;
+        if (k === 'styrke') return (e.styrke||0) >= STYRKE_OVERVIEW_THRESHOLD;
         return (e[k]||0) > 0;
       })
       // If filter active, only show matching dot
@@ -1415,7 +1415,7 @@ function renderBody(params) {
     { k:'fotball',  val: fmtVal(totals.fotball,  false), unit:'min' },
     { k:'svom',     val: fmtVal(totals.svom,     false), unit:'m'   },
     { k:'langrenn', val: fmtVal(totals.langrenn, true),  unit:'km'  },
-    { k:'styrke',   val: fmtVal(totals.styrke,   false), unit:'sett'},
+    { k:'styrke',   val: fmtVal(totals.styrke,   false), unit:'enheter'},
   ];
 
   const breakdownHtml = breakdownItems.map(({ k, val, unit }) => `
@@ -1508,7 +1508,8 @@ function renderBody(params) {
 // ─── HELPERS ───────────────────────────────────────────────────
 function hasAny(e) {
   if (!e) return false;
-  return (e.skog||0)>0 || (e.vei||0)>0 || (e.fotball||0)>0 || (e.svom||0)>0 || (e.styrke||0)>0 || (e.langrenn||0)>0;
+  return (e.skog||0)>0 || (e.vei||0)>0 || (e.fotball||0)>0 || (e.svom||0)>0
+      || (e.styrke||0)>=STYRKE_OVERVIEW_THRESHOLD || (e.langrenn||0)>0;
 }
 
 function daysInMonth(yr, mi) {
