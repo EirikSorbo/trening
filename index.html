@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Trening</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 680 480'%3E%3Crect x='140' y='30' width='400' height='400' rx='80' fill='%231a1a2e'/%3E%3Crect x='176' y='104' width='284' height='32' rx='7' fill='%234a9e78'/%3E%3Crect x='176' y='150' width='218' height='32' rx='7' fill='%233d7cb5'/%3E%3Crect x='176' y='196' width='164' height='32' rx='7' fill='%23c49a3d'/%3E%3Crect x='176' y='242' width='238' height='32' rx='7' fill='%23e07840'/%3E%3Crect x='176' y='288' width='196' height='32' rx='7' fill='%237a5a9e'/%3E%3Crect x='176' y='334' width='132' height='32' rx='7' fill='%239e5a7a'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 680 480'%3E%3Crect x='140' y='30' width='400' height='400' rx='80' fill='%231a1a2e'/%3E%3Crect x='176' y='104' width='284' height='32' rx='7' fill='%234a9e78'/%3E%3Crect x='176' y='150' width='218' height='32' rx='7' fill='%233d7cb5'/%3E%3Crect x='176' y='196' width='164' height='32' rx='7' fill='%23c49a3d'/%3E%3Crect x='176' y='242' width='238' height='32' rx='7' fill='%23e07840'/%3E%3Crect x='176' y='288' width='196' height='32' rx='7' fill='%237a5a9e'/%3E%3Crect x='176' y='334' width='132' height='32' rx='7' fill='%239e5a7a'/%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Trening">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
@@ -658,7 +663,32 @@ body {
   cursor: pointer;
 }
 
-/* ── TOAST ───────────────────────────── */
+/* ── IO BAR ──────────────────────────── */
+.io-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  padding-bottom: 10px;
+}
+
+.io-btn {
+  flex: 1;
+  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--rs);
+  padding: 14px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.io-btn:active { border-color: var(--accent); color: var(--accent); }
+
+/* ── TOAST ──────────────────────────── */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -776,6 +806,12 @@ body {
       <button class="nav-btn" onclick="changePeriod(1)">›</button>
     </div>
     <div id="overview-body"></div>
+
+    <div class="io-bar">
+      <button class="io-btn" onclick="exportData()">↑ Eksporter</button>
+      <button class="io-btn" onclick="document.getElementById('import-input').click()">↓ Importer</button>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
   </div>
 </div>
 
@@ -1531,6 +1567,45 @@ function getWeeksInMonth(monthDate) {
     ws = new Date(ws); ws.setDate(ws.getDate()+7);
   }
   return weeks;
+}
+
+// ─── EXPORT / IMPORT ───────────────────────────────────────────
+function exportData() {
+  const data     = loadAll();
+  const today    = dateStr(new Date());
+  const filename = `trening-backup-${today}.json`;
+  const blob     = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href         = url;
+  a.download     = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Eksportert · ' + filename);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
+      persistAll(parsed);
+      renderStrip();
+      loadForm();
+      renderOverview();
+      showToast('Importert · ' + file.name);
+    } catch {
+      showToast('Feil: ugyldig backup-fil');
+    }
+    // Reset so the same file can be re-imported if needed
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 // ─── INIT ──────────────────────────────────────────────────────
