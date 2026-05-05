@@ -61,6 +61,27 @@ body {
   text-transform: uppercase;
 }
 
+.header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.header-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--rs);
+  border: 1px solid var(--edge);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.header-icon-btn:active { border-color: var(--accent); color: var(--accent); }
+
 /* ── TAB BAR ─────────────────────────── */
 .tab-bar {
   display: flex;
@@ -663,31 +684,6 @@ body {
   cursor: pointer;
 }
 
-/* ── IO BAR ──────────────────────────── */
-.io-bar {
-  display: flex;
-  gap: 8px;
-  margin-top: 20px;
-  padding-bottom: 10px;
-}
-
-.io-btn {
-  flex: 1;
-  background: var(--paper);
-  border: 1px solid var(--edge);
-  border-radius: var(--rs);
-  padding: 14px;
-  font-family: 'Geist Mono', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.io-btn:active { border-color: var(--accent); color: var(--accent); }
-
 /* ── TOAST ──────────────────────────── */
 .toast {
   position: fixed;
@@ -714,6 +710,19 @@ body {
 
 <header class="app-header">
   <div class="header-logo">Trening</div>
+  <div class="header-actions">
+    <button class="header-icon-btn" onclick="exportData()" title="Eksporter data">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <path d="M7.5 1v9M4 7l3.5 3.5L11 7M2 12h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button class="header-icon-btn" onclick="document.getElementById('import-input').click()" title="Importer data">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <path d="M7.5 14V5M4 8.5L7.5 5 11 8.5M2 3h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
 </header>
 
 <div class="tab-bar">
@@ -806,12 +815,6 @@ body {
       <button class="nav-btn" onclick="changePeriod(1)">›</button>
     </div>
     <div id="overview-body"></div>
-
-    <div class="io-bar">
-      <button class="io-btn" onclick="exportData()">↑ Eksporter</button>
-      <button class="io-btn" onclick="document.getElementById('import-input').click()">↓ Importer</button>
-      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
-    </div>
   </div>
 </div>
 
